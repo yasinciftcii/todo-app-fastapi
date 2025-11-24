@@ -1,7 +1,14 @@
 from fastapi import FastAPI
+from .database import create_db_and_tables
 
 # Initialize the FastAPI application
 app = FastAPI(title="To-Do App Backend")
+
+# Application startup event handler
+@app.on_event("startup")
+def on_startup():
+    """Initializes the database connection and creates tables on startup."""
+    create_db_and_tables()
 
 # Root endpoint
 @app.get("/")
