@@ -6,7 +6,7 @@ import os
 # Load database URL from environment variable or use a default local connection string
 DATABASE_URL = os.getenv(
     "DATABASE_URL", 
-    "postgresql://user:password@localhost:5432/todo_db"
+    "postgresql://user:password@localhost:5432/db_name"
 )
 
 # 2. CREATE ENGINE
