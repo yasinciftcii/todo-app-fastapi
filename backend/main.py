@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from database import create_db_and_tables, get_session
 from typing import List
 from sqlmodel import SQLModel, Session, select
-from models import Todo, TodoCreate, TodoRead
+from models import Todo, TodoCreate, TodoRead, TodoUpdate
 from fastapi import Depends, HTTPException
 from typing import Optional
 from contextlib import asynccontextmanager
@@ -24,23 +24,23 @@ app = FastAPI(title="To-Do App Backend", lifespan=lifespan)
 
 # 1. CREATE
 @app.post("/todos/", response_model=TodoRead)
-def create_todo(*, session: Session = Depends(get_session), todo: TodoCreate):
+def create_todo(*, session: Session = Depends(get_session), todo: TodoCreate, current_user: User = Depends(get_current_user)):
     """Creates a new todo item in the database."""
-    db_todo = Todo.model_validate(todo)
+    todo_with_owner = Todo.model_validate(todo, update={"owner_uid": current_user.uid})
     
     # Add new todo to the session and commit
-    session.add(db_todo)
+    session.add(todo_with_owner)
     session.commit()
-    session.refresh(db_todo)
+    session.refresh(todo_with_owner)
     
-    return db_todo
+    return todo_with_owner
 
 # 2. READ All
 @app.get("/todos/", response_model=List[TodoRead])
-def read_todos(*, session: Session = Depends(get_session)):
+def read_todos(*, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
     """Retrieves all todo items."""
     # Use SQLModel's select command to fetch all Todo records
-    todos = session.exec(select(Todo)).all()
+    todos = session.exec(select(Todo).where(Todo.owner_uid == current_user.uid)).all()
     return todos
 
 # 3. READ One (Retrieve a specific To-Do by ID)
@@ -51,6 +51,7 @@ def read_todo(*, session: Session = Depends(get_session), todo_id: int):
     if not todo:
         raise HTTPException(status_code=404, detail="Todo not found")
     return todo
+
 # 4. UPDATE
 class TodoUpdate(SQLModel):
     """Schema used for updating a todo item (all fields are optional)."""
@@ -59,11 +60,15 @@ class TodoUpdate(SQLModel):
     is_completed: Optional[bool] = None
 
 @app.put("/todos/{todo_id}", response_model=TodoRead)
-def update_todo(*, session: Session = Depends(get_session), todo_id: int, todo: TodoUpdate):
+def update_todo(*, session: Session = Depends(get_session), todo_id: int, todo: TodoUpdate, current_user: User = Depends(get_current_user)):
     """Updates an existing todo item."""
     db_todo = session.get(Todo, todo_id)
+    
     if not db_todo:
         raise HTTPException(status_code=404, detail="Todo not found")
+
+    if db_todo.owner_uid != current_user.uid:
+        raise HTTPException(status_code=403, detail="Not authorized to modify this todo")
 
     
     todo_data = todo.model_dump(exclude_unset=True)
@@ -76,11 +81,15 @@ def update_todo(*, session: Session = Depends(get_session), todo_id: int, todo: 
 
 # 5. DELETE
 @app.delete("/todos/{todo_id}")
-def delete_todo(*, session: Session = Depends(get_session), todo_id: int):
+def delete_todo(*, session: Session = Depends(get_session), todo_id: int, current_user: User = Depends(get_current_user)):
     """Deletes a todo item by its ID."""
     todo = session.get(Todo, todo_id)
+    
     if not todo:
         raise HTTPException(status_code=404, detail="Todo not found")
+
+    if todo.owner_uid != current_user.uid:
+        raise HTTPException(status_code=403, detail="Not authorized to delete this todo")
 
     session.delete(todo)
     session.commit()
