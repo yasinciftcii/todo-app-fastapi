@@ -6,12 +6,15 @@ from models import Todo, TodoCreate, TodoRead
 from fastapi import Depends, HTTPException
 from typing import Optional
 from contextlib import asynccontextmanager
+from auth import initialize_firebase, get_current_user, User
+
 
 # LIFESPAN Context Manager
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initializes DB connection and tables before the app starts, and handles cleanup."""
     print("Application starting up...")
+    initialize_firebase()
     create_db_and_tables()
     yield
     print("Application shutting down...")
