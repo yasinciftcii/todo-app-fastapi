@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends, HTTPException
 from database import create_db_and_tables, get_session
 from typing import List
 from sqlmodel import SQLModel, Session, select
@@ -7,6 +7,7 @@ from fastapi import Depends, HTTPException
 from typing import Optional
 from contextlib import asynccontextmanager
 from auth import initialize_firebase, get_current_user, User
+from exceptions import TodoNotFound, AuthorizationError
 
 
 # LIFESPAN Context Manager
@@ -49,7 +50,7 @@ def read_todo(*, session: Session = Depends(get_session), todo_id: int):
     """Retrieves a single todo item by its ID."""
     todo = session.get(Todo, todo_id)
     if not todo:
-        raise HTTPException(status_code=404, detail="Todo not found")
+        raise TodoNotFound(todo_id)
     return todo
 
 # 4. UPDATE
@@ -65,10 +66,10 @@ def update_todo(*, session: Session = Depends(get_session), todo_id: int, todo: 
     db_todo = session.get(Todo, todo_id)
     
     if not db_todo:
-        raise HTTPException(status_code=404, detail="Todo not found")
+        raise TodoNotFound(todo_id)
 
     if db_todo.owner_uid != current_user.uid:
-        raise HTTPException(status_code=403, detail="Not authorized to modify this todo")
+        raise AuthorizationError()
 
     
     todo_data = todo.model_dump(exclude_unset=True)
@@ -86,10 +87,10 @@ def delete_todo(*, session: Session = Depends(get_session), todo_id: int, curren
     todo = session.get(Todo, todo_id)
     
     if not todo:
-        raise HTTPException(status_code=404, detail="Todo not found")
+        raise TodoNotFound(todo_id)
 
     if todo.owner_uid != current_user.uid:
-        raise HTTPException(status_code=403, detail="Not authorized to delete this todo")
+        raise AuthorizationError()
 
     session.delete(todo)
     session.commit()
