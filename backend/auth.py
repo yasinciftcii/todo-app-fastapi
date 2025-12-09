@@ -4,49 +4,54 @@ from fastapi import Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
 from typing import Optional
 from sqlmodel import SQLModel
+import os
+import json
 
-
-FIREBASE_SERVICE_ACCOUNT_PATH = "firebase-service-account.json" 
-
-# 1. Start Firebase Admin SDK'
+# 1. Firebase Admin SDK Başlatma
 def initialize_firebase():
-    """Initializes the Firebase Admin SDK using the service account key."""
+    """Initializes Firebase from Environment Variable (Prod) or Local File (Dev)."""
     try:
-        # Check if already initialized to avoid re-initialization
         if not firebase_admin._apps:
-            cred = credentials.Certificate(FIREBASE_SERVICE_ACCOUNT_PATH)
-            firebase_admin.initialize_app(cred)
-            print("Firebase Admin SDK initialized successfully.")
+            # Seçenek A: Ortam Değişkeni (Docker/Coolify için)
+            firebase_creds_json = os.getenv("FIREBASE_CREDENTIALS")
+            
+            if firebase_creds_json:
+                # JSON stringini dictionary'ye çevir
+                cred_dict = json.loads(firebase_creds_json)
+                cred = credentials.Certificate(cred_dict)
+                firebase_admin.initialize_app(cred)
+                print("Firebase Admin SDK initialized via Environment Variable.")
+            
+            # Seçenek B: Yerel Dosya (Local Dev için)
+            else:
+                local_file = "firebase-service-account.json"
+                if os.path.exists(local_file):
+                    cred = credentials.Certificate(local_file)
+                    firebase_admin.initialize_app(cred)
+                    print("Firebase Admin SDK initialized via Local File.")
+                else:
+                    print("WARNING: No Firebase credentials found!")
+
     except Exception as e:
-        # Prevent application from starting if Firebase initialization fails
-        print(f"FATAL ERROR: Could not initialize Firebase Admin SDK. {e}")
+        print(f"FATAL ERROR: Could not initialize Firebase. {e}")
 
-
-# User model to hold user information
+# User model
 class User(SQLModel):
     uid: str
     email: str
 
-# OAuth2 Scheme for token extraction
+# OAuth2 Scheme
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
-
-# 2. JWT Token Verification Dependency
+# 2. Dependency
 async def get_current_user(token: Optional[str] = Depends(oauth2_scheme)) -> User:
-    """
-    FastAPI Dependency to validate Firebase JWT and retrieve user details.
-    (NOTE: oauth2_scheme is not defined yet, we will fix this part in main.py.)
-    """
     if not token:
         raise HTTPException(status_code=401, detail="Authentication token missing.")
 
     try:
-        # Firebase's token verification function
         decoded_token = auth.verify_id_token(token)
         uid = decoded_token['uid']
         email = decoded_token.get('email', 'N/A')
-
-        # Returning the verified user's UID
         return User(uid=uid, email=email)
     except auth.InvalidIdToken:
         raise HTTPException(status_code=401, detail="Invalid or expired token.")

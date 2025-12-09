@@ -99,4 +99,4 @@ def test_update_todo_unauthorized(client: TestClient, user_uid: str, other_uid: 
     
     # Critical Check: Should return an authorization error
     assert response.status_code == 403
-    assert response.json()["detail"] == "Not authorized to modify this todo"
+    assert response.json()["detail"] == "Not authorized to perform this action."
