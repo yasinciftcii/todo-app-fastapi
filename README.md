@@ -45,8 +45,8 @@ Follow these instructions to get the project up and running on your local machin
 
 ### 1. Clone the Repository
 ```bash
-git clone https://github.com/YOUR_USERNAME/REPO_NAME.git
-cd REPO_NAME
+git clone https://github.com/yasinciftcii/todo-app-fastapi.git
+cd todo-app-fastapi
 ```
 
 ### 2. Environment Setup ⚙️
