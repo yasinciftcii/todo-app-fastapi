@@ -3,11 +3,11 @@ from database import create_db_and_tables, get_session
 from typing import List
 from sqlmodel import SQLModel, Session, select
 from models import Todo, TodoCreate, TodoRead, TodoUpdate
-from fastapi import Depends, HTTPException
 from typing import Optional
 from contextlib import asynccontextmanager
 from auth import initialize_firebase, get_current_user, User
 from exceptions import TodoNotFound, AuthorizationError
+from fastapi.middleware.cors import CORSMiddleware
 
 
 # LIFESPAN Context Manager
@@ -22,6 +22,16 @@ async def lifespan(app: FastAPI):
 
 # Initialize the FastAPI application
 app = FastAPI(title="To-Do App Backend", lifespan=lifespan)
+
+# CORS Integration
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origin_regex=".*",
+    allow_credentials=True,
+    allow_methods=["*"],    # Allow All Methods (GET, POST, PUT, DELETE)
+    allow_headers=["*"],    # Allow All Headers (Authorization vb.)
+)
 
 # 1. CREATE
 @app.post("/todos/", response_model=TodoRead)
@@ -71,9 +81,10 @@ def update_todo(*, session: Session = Depends(get_session), todo_id: int, todo: 
     if db_todo.owner_uid != current_user.uid:
         raise AuthorizationError()
 
-    
     todo_data = todo.model_dump(exclude_unset=True)
-    db_todo.model_validate(todo_data, update=True)
+
+    for key, value in todo_data.items():
+        setattr(db_todo, key, value)
 
     session.add(db_todo)
     session.commit()
