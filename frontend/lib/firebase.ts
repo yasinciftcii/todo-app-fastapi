@@ -1,5 +1,3 @@
-// frontend/lib/firebase.ts
-
 import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
 import { getAuth } from "firebase/auth";
@@ -18,11 +16,10 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// Auth servisi (Sunucuda ve istemcide çalışabilir)
+// Auth Service
 export const auth = getAuth(app);
 
-// Analytics SADECE tarayıcı ortamında (Client-Side) başlatılır
-// Bu kontrol "ReferenceError: window is not defined" hatasını çözer
+// Analytics Service
 let analytics;
 if (typeof window !== "undefined") {
     analytics = getAnalytics(app);
