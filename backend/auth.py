@@ -6,31 +6,44 @@ from typing import Optional
 from sqlmodel import SQLModel
 import os
 import json
+from dotenv import load_dotenv
+
+# .env dosyasını yükle (Local geliştirme için)
+load_dotenv()
 
 # 1. Firebase Admin SDK Başlatma
 def initialize_firebase():
     """Initializes Firebase from Environment Variable (Prod) or Local File (Dev)."""
     try:
         if not firebase_admin._apps:
-            # Seçenek A: Ortam Değişkeni (Docker/Coolify için)
-            firebase_creds_json = os.getenv("FIREBASE_CREDENTIALS")
+            # Seçenek A: Raw JSON String (Render/Vercel gibi yerlerde Environment Variable olarak)
+            firebase_creds_json = os.getenv("FIREBASE_CREDENTIALS_JSON")
             
+            # Seçenek B: Dosya Yolu (Localde .env dosyasından okunur)
+            firebase_creds_path = os.getenv("FIREBASE_CREDENTIALS_PATH")
+
             if firebase_creds_json:
                 # JSON stringini dictionary'ye çevir
                 cred_dict = json.loads(firebase_creds_json)
                 cred = credentials.Certificate(cred_dict)
                 firebase_admin.initialize_app(cred)
-                print("Firebase Admin SDK initialized via Environment Variable.")
+                print("Firebase Admin SDK initialized via JSON Environment Variable.")
             
-            # Seçenek B: Yerel Dosya (Local Dev için)
+            elif firebase_creds_path and os.path.exists(firebase_creds_path):
+                # Belirtilen dosya yolundan oku
+                cred = credentials.Certificate(firebase_creds_path)
+                firebase_admin.initialize_app(cred)
+                print(f"Firebase Admin SDK initialized via File Path: {firebase_creds_path}")
+                
             else:
-                local_file = "firebase-service-account.json"
-                if os.path.exists(local_file):
-                    cred = credentials.Certificate(local_file)
+                # Son çare: Varsayılan dosya adına bak
+                default_file = "serviceAccountKey.json"
+                if os.path.exists(default_file):
+                    cred = credentials.Certificate(default_file)
                     firebase_admin.initialize_app(cred)
-                    print("Firebase Admin SDK initialized via Local File.")
+                    print("Firebase Admin SDK initialized via default local file.")
                 else:
-                    print("WARNING: No Firebase credentials found!")
+                    print("WARNING: No Firebase credentials found! Check your .env file.")
 
     except Exception as e:
         print(f"FATAL ERROR: Could not initialize Firebase. {e}")
