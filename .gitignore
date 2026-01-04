@@ -1,1 +1,24 @@
+# General
+__pycache__/
+*.pyc
+.DS_Store
+
+# Environment Variables
 .env
+.env.local
+.env.*
+
+# Python
+venv/
+env/
+backend/venv/
+backend/env/
+
+# Node Modules
+node_modules/
+frontend/node_modules/
+
+# Firebase Sensitive Files
+serviceAccountKey.json
+backend/serviceAccountKey.json
+firebase-service-account.json
