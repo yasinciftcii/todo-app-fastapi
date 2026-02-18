@@ -66,7 +66,7 @@ async def get_current_user(token: Optional[str] = Depends(oauth2_scheme)) -> Use
         uid = decoded_token['uid']
         email = decoded_token.get('email', 'N/A')
         return User(uid=uid, email=email)
-    except auth.InvalidIdToken:
+    except auth.InvalidIdTokenError:
         raise HTTPException(status_code=401, detail="Invalid or expired token.")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Authentication error: {e}")

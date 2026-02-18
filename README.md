@@ -1,118 +1,163 @@
-# 🚀 Full Stack To-Do App (FastAPI & Next.js)
+# 🚀 Full Stack Sticky Wall (FastAPI & Next.js)
 
-A modern, secure, and containerized To-Do application built with **FastAPI (Python)** and **Next.js (TypeScript)**. It features real-time updates, Firebase authentication, and a robust PostgreSQL database.
+A modern, secure, and production-ready Sticky Notes / To-Do application built with **FastAPI (Python)** and **Next.js (TypeScript)**.
 
-![Home Page](./screenshots/home_page.png)
+This app allows users to create, manage, and organize tasks with categories, priority levels, due dates, and a modern sticky-wall UI.
 
-## 🛠️ Tech Stack
-
-### Backend
-* **Framework:** FastAPI (Python 3.10)
-* **Database:** PostgreSQL 15 (Managed via SQLModel/SQLAlchemy)
-* **Authentication:** Firebase Admin SDK
-* **Testing:** Pytest & Httpx (In-Memory SQLite testing)
-* **Containerization:** Docker & Docker Compose
-
-### Frontend
-* **Framework:** Next.js 14 (App Router)
-* **Language:** TypeScript
-* **Styling:** Chakra UI
-* **State Management:** Zustand
-* **HTTP Client:** Axios
+🌐 **Live Demo:**  
+Frontend (Vercel): https://dotodo-app.vercel.app/login  
+Backend API Docs: https://your-backend-url/docs
 
 ---
 
-## 🖼️ Gallery
+# ✨ Features
 
-| Login Page | Register Page |
-|:---:|:---:|
-| ![Login Page](./screenshots/login_page.png) | ![Register Page](./screenshots/register_page.png) |
+## 📝 Task Management
+- Create sticky note tasks
+- Edit tasks anytime
+- Delete tasks with confirmation modal
+- Mark tasks as completed
+- Modern sticky-wall visual layout
 
-| Tasks Management |
-|:---:|
-| ![Tasks Page](./screenshots/tasks_page.png) |
+## 🚦 Priority System
+Each task can have a priority level:
+
+- 🟢 Low
+- 🟡 Medium
+- 🔴 High
+
+Priority is visible directly on the sticky card.
 
 ---
 
-## 🚀 Getting Started
+## 📂 Category Management
+Full category lifecycle support:
 
-Follow these instructions to get the project up and running on your local machine.
+- Create category
+- Rename category
+- Delete category
+- Automatic fallback to **Uncategorized** when category is deleted
+- Each task displays its category clearly
 
-### Prerequisites
-* Docker & Docker Compose
-* Node.js (Optional, if running frontend locally without Docker)
-* A Firebase Project (for authentication)
+---
 
-### 1. Clone the Repository
+## 📅 Due Date & Countdown
+Tasks support due dates with smart indicators:
+
+- Select due date when creating or editing task
+- Automatically shows:
+
+Examples:
+
+- `Today`
+- `3 days left`
+- `Overdue 2d`
+
+This helps users track deadlines easily.
+
+---
+
+## ✏️ Edit Tasks After Creation
+
+Users can edit:
+
+- Title
+- Priority
+- Category
+- Due date
+
+Using a modern edit modal.
+
+---
+
+## 🔔 Toast Notification System
+
+Beautiful toast alerts for:
+
+- Task created
+- Task updated
+- Task deleted
+- Errors
+
+Improves UX and feedback.
+
+---
+
+## 🔐 Authentication
+
+Secure Firebase authentication:
+
+- Register
+- Login
+- Logout
+- Token-based backend protection
+
+Each user only sees their own tasks and categories.
+
+---
+
+# 🛠️ Tech Stack
+
+## Backend
+
+- FastAPI (Python 3.10)
+- SQLModel (SQLAlchemy)
+- PostgreSQL (Render hosted)
+- Firebase Admin SDK
+- Pydantic
+- Docker
+
+## Frontend
+
+- Next.js 14 (App Router)
+- TypeScript
+- TailwindCSS
+- Axios
+- Firebase Client SDK
+- DnD-kit (Drag UI only)
+- Modern custom UI components
+
+---
+
+# 🖼️ Screenshots
+
+| Login | Register |
+|------|---------|
+| ![](./screenshots/login_page.png) | ![](./screenshots/register_page.png) |
+
+| Sticky Wall |
+|------------|
+| ![](./screenshots/home_page.png) |
+
+---
+
+# 🧠 Architecture Overview
+
+Frontend (Next.js, Vercel)
+⬇  
+REST API  
+⬇  
+Backend (FastAPI, Render)  
+⬇  
+PostgreSQL Database (Render)
+
+Authentication handled via Firebase.
+
+---
+
+# 🚀 Getting Started (Local Development)
+
+## Requirements
+
+- Node.js 18+
+- Python 3.10+
+- PostgreSQL
+- Firebase Project
+
+---
+
+## 1. Clone repository
+
 ```bash
 git clone https://github.com/yasinciftcii/todo-app-fastapi.git
 cd todo-app-fastapi
-```
-
-### 2. Environment Setup ⚙️
-
-Since this project handles sensitive data, we use environment variables. You need to configure them before running the app.
-
-**Backend Setup:**
-1.  Navigate to the `backend/` folder.
-2.  Create a copy of the example file:
-    * Copy content from `backend/.env.example` to a new file named `.env`.
-3.  Open `backend/.env` and fill in your database credentials.
-4.  Place your Firebase Admin JSON file inside the `backend/` folder and rename it to:
-    * `firebase-service-account.json`
-
-**Frontend Setup:**
-1.  Navigate to the `frontend/` folder.
-2.  Create a copy of the example file:
-    * Copy content from `frontend/.env.local.example` to a new file named `.env.local`.
-3.  Open `frontend/.env.local` and paste your Firebase Client keys (API Key, Auth Domain, etc.) from the Firebase Console.
-
-### 3. Run with Docker 🐳
-
-The easiest way to run the app is using Docker Compose. This will set up the database, backend, and frontend containers automatically.
-
-```bash
-docker-compose up -d --build
-```
-
-Once the containers are running, you can access the application:
-
-* **Frontend (App):** [http://localhost:3000](http://localhost:3000)
-* **Backend (API Docs):** [http://localhost:8000/docs](http://localhost:8000/docs)
-
----
-
-## 🧪 Running Tests
-
-Unit tests are written using `pytest`. They run in an isolated environment using an in-memory SQLite database, ensuring no data corruption in your main database.
-
-```bash
-# Run tests inside the running Docker container
-docker exec todo_backend pytest
-```
-
----
-
-## 🔒 Security Features
-
-* **Environment Variables:** Sensitive keys are strictly separated from the code using `.env` files (not committed to Git).
-* **CORS Protection:** Configured to restrict unauthorized domain access.
-* **Auth Middleware:** Custom FastAPI dependency to verify Firebase tokens on protected endpoints.
-* **SQL Injection Protection:** Usage of ORM (SQLModel) prevents raw SQL vulnerabilities.
-* **Container Isolation:** Database runs in a separate container, not exposed to the public internet.
-
-## 📂 Project Structure
-
-```bash
-├── backend/             # FastAPI Application
-│   ├── main.py          # Entry point
-│   ├── models.py        # Database models
-│   ├── auth.py          # Firebase Auth logic
-│   └── tests/           # Unit tests
-├── frontend/            # Next.js Application
-│   ├── app/             # App Router pages
-│   ├── components/      # Reusable UI components
-│   └── lib/             # API and Firebase config
-├── docker-compose.yml   # Docker orchestration
-└── README.md            # Project documentation
-```

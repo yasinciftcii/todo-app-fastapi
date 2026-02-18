@@ -1,80 +1,184 @@
 from fastapi import FastAPI, Depends, HTTPException
 from database import create_db_and_tables, get_session
 from typing import List
-from sqlmodel import SQLModel, Session, select
-from models import Todo, TodoCreate, TodoRead, TodoUpdate
-from typing import Optional
+from sqlmodel import Session, select
 from contextlib import asynccontextmanager
-from auth import initialize_firebase, get_current_user, User
-from exceptions import TodoNotFound, AuthorizationError
 from fastapi.middleware.cors import CORSMiddleware
 
+from models import (
+    Todo, TodoCreate, TodoRead, TodoUpdate,
+    Category, CategoryCreate, CategoryRead, CategoryUpdate
+)
 
-# LIFESPAN Context Manager
+from auth import initialize_firebase, get_current_user, User
+from exceptions import TodoNotFound, AuthorizationError
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Initializes DB connection and tables before the app starts, and handles cleanup."""
     print("Application starting up...")
     initialize_firebase()
     create_db_and_tables()
     yield
     print("Application shutting down...")
 
-# Initialize the FastAPI application
-app = FastAPI(title="To-Do App Backend", lifespan=lifespan)
 
-# CORS Integration
+app = FastAPI(title="To-Do App Backend", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=".*",
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ],
     allow_credentials=True,
-    allow_methods=["*"],    # Allow All Methods (GET, POST, PUT, DELETE)
-    allow_headers=["*"],    # Allow All Headers (Authorization vb.)
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
-# 1. CREATE
+
+# -------------------------
+# Category Endpoints
+# -------------------------
+@app.post("/categories/", response_model=CategoryRead)
+def create_category(
+    category: CategoryCreate,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    db_category = Category(
+        name=category.name.strip(),
+        owner_uid=current_user.uid
+    )
+
+    if not db_category.name:
+        raise HTTPException(status_code=422, detail="Category name cannot be empty")
+
+    session.add(db_category)
+    session.commit()
+    session.refresh(db_category)
+    return db_category
+
+
+@app.get("/categories/", response_model=List[CategoryRead])
+def read_categories(
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    statement = select(Category).where(Category.owner_uid == current_user.uid)
+    return session.exec(statement).all()
+
+
+@app.put("/categories/{category_id}", response_model=CategoryRead)
+def update_category(
+    category_id: int,
+    payload: CategoryUpdate,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    category = session.get(Category, category_id)
+    if not category:
+        raise HTTPException(status_code=404, detail="Category not found")
+
+    if category.owner_uid != current_user.uid:
+        raise HTTPException(status_code=403, detail="Not allowed")
+
+    if payload.name is not None:
+        new_name = payload.name.strip()
+        if not new_name:
+            raise HTTPException(status_code=422, detail="Category name cannot be empty")
+        category.name = new_name
+
+    session.add(category)
+    session.commit()
+    session.refresh(category)
+    return category
+
+
+@app.delete("/categories/{category_id}")
+def delete_category(
+    category_id: int,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Delete a category and move its todos to Uncategorized (category_id=None)."""
+    category = session.get(Category, category_id)
+    if not category:
+        raise HTTPException(status_code=404, detail="Category not found")
+
+    if category.owner_uid != current_user.uid:
+        raise HTTPException(status_code=403, detail="Not allowed")
+
+    todos_in_category = session.exec(
+        select(Todo).where(
+            Todo.owner_uid == current_user.uid,
+            Todo.category_id == category_id
+        )
+    ).all()
+
+    for t in todos_in_category:
+        t.category_id = None
+        session.add(t)
+
+    session.delete(category)
+    session.commit()
+
+    return {"ok": True, "moved_todos": len(todos_in_category)}
+
+
+# -------------------------
+# Todo Endpoints
+# -------------------------
 @app.post("/todos/", response_model=TodoRead)
-def create_todo(*, session: Session = Depends(get_session), todo: TodoCreate, current_user: User = Depends(get_current_user)):
-    """Creates a new todo item in the database."""
+def create_todo(
+    *,
+    session: Session = Depends(get_session),
+    todo: TodoCreate,
+    current_user: User = Depends(get_current_user)
+):
     todo_with_owner = Todo.model_validate(todo, update={"owner_uid": current_user.uid})
-    
-    # Add new todo to the session and commit
     session.add(todo_with_owner)
     session.commit()
     session.refresh(todo_with_owner)
-    
     return todo_with_owner
 
-# 2. READ All
-@app.get("/todos/", response_model=List[TodoRead])
-def read_todos(*, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
-    """Retrieves all todo items."""
-    # Use SQLModel's select command to fetch all Todo records
-    todos = session.exec(select(Todo).where(Todo.owner_uid == current_user.uid)).all()
-    return todos
 
-# 3. READ One (Retrieve a specific To-Do by ID)
+@app.get("/todos/", response_model=List[TodoRead])
+def read_todos(
+    *,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    # Default ordering: newest first (you can change to due_date if you want)
+    statement = (
+        select(Todo)
+        .where(Todo.owner_uid == current_user.uid)
+        .order_by(Todo.created_at.desc())
+    )
+    return session.exec(statement).all()
+
+
 @app.get("/todos/{todo_id}", response_model=TodoRead)
-def read_todo(*, session: Session = Depends(get_session), todo_id: int):
-    """Retrieves a single todo item by its ID."""
+def read_todo(
+    *,
+    session: Session = Depends(get_session),
+    todo_id: int
+):
     todo = session.get(Todo, todo_id)
     if not todo:
         raise TodoNotFound(todo_id)
     return todo
 
-# 4. UPDATE
-class TodoUpdate(SQLModel):
-    """Schema used for updating a todo item (all fields are optional)."""
-    title: Optional[str] = None
-    description: Optional[str] = None
-    is_completed: Optional[bool] = None
 
 @app.put("/todos/{todo_id}", response_model=TodoRead)
-def update_todo(*, session: Session = Depends(get_session), todo_id: int, todo: TodoUpdate, current_user: User = Depends(get_current_user)):
-    """Updates an existing todo item."""
+def update_todo(
+    *,
+    session: Session = Depends(get_session),
+    todo_id: int,
+    todo: TodoUpdate,
+    current_user: User = Depends(get_current_user)
+):
     db_todo = session.get(Todo, todo_id)
-    
     if not db_todo:
         raise TodoNotFound(todo_id)
 
@@ -82,7 +186,6 @@ def update_todo(*, session: Session = Depends(get_session), todo_id: int, todo: 
         raise AuthorizationError()
 
     todo_data = todo.model_dump(exclude_unset=True)
-
     for key, value in todo_data.items():
         setattr(db_todo, key, value)
 
@@ -91,12 +194,15 @@ def update_todo(*, session: Session = Depends(get_session), todo_id: int, todo: 
     session.refresh(db_todo)
     return db_todo
 
-# 5. DELETE
+
 @app.delete("/todos/{todo_id}")
-def delete_todo(*, session: Session = Depends(get_session), todo_id: int, current_user: User = Depends(get_current_user)):
-    """Deletes a todo item by its ID."""
+def delete_todo(
+    *,
+    session: Session = Depends(get_session),
+    todo_id: int,
+    current_user: User = Depends(get_current_user)
+):
     todo = session.get(Todo, todo_id)
-    
     if not todo:
         raise TodoNotFound(todo_id)
 
@@ -107,12 +213,12 @@ def delete_todo(*, session: Session = Depends(get_session), todo_id: int, curren
     session.commit()
     return {"ok": True}
 
-# Root endpoint
+
 @app.get("/")
 def read_root():
     return {"message": "Hello World from FastAPI! The To-Do API is running."}
 
-# Health check endpoint for deployment tools
+
 @app.get("/health")
 def health_check():
     return {"status": "ok"}

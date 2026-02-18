@@ -1,230 +1,288 @@
-'use client'
+"use client";
 
-import { useEffect, useState } from 'react';
-import { 
-  Container, VStack, Input, Button, Text, 
-  Spinner, useToast, HStack, Badge, IconButton, 
-  Card, CardBody, Divider, Flex, Spacer, Box
-} from '@chakra-ui/react';
-import { DeleteIcon, AddIcon, CheckIcon } from '@chakra-ui/icons'; 
-import { useRouter } from 'next/navigation';
-import { useAuthStore } from '../store/authStore';
-import { api } from '../lib/api';
-import { auth } from '../lib/firebase';
-import Navbar from './components/Navbar';
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { onAuthStateChanged, signOut } from "firebase/auth";
 
-// To-Do Interface
-interface Todo {
-  id: number;
-  title: string;
-  description?: string;
-  is_completed: boolean;
-  owner_uid: string;
-}
+import { DndContext, closestCenter } from "@dnd-kit/core";
+import { SortableContext, rectSortingStrategy, arrayMove } from "@dnd-kit/sortable";
 
-export default function Home() {
-  const [todos, setTodos] = useState<Todo[]>([]);
-  const [newTodo, setNewTodo] = useState('');
-  const [loading, setLoading] = useState(true);
-  
-  const router = useRouter();
-  const toast = useToast();
+import { auth } from "../lib/firebase";
+import { getTodos, updateTodo, deleteTodo, getCategories } from "../lib/api";
+import { Todo, Category } from "../types";
 
-  // Check authentication status on mount
-  useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged((currentUser) => {
-      if (!currentUser) {
-        router.push('/login');
-      } else {
-        fetchTodos();
-      }
-    });
-    return () => unsubscribe();
-  }, [router]);
+import TodoForm from "./components/TodoForm";
+import CategoryManager from "./components/CategoryManager";
+import ConfirmModal from "./components/ConfirmModal";
+import EditTodoModal from "./components/EditTodoModal";
+import SortableTodoCard from "./components/SortableTodoCard";
+import { useToast } from "./components/ToastProvider";
 
-  // --- API OPERATIONS ---
+// Sticky note colors
+const STICKY_COLORS = [
+  "bg-yellow-100 border-yellow-200",
+  "bg-red-100 border-red-200",
+  "bg-blue-100 border-blue-200",
+  "bg-green-100 border-green-200",
+  "bg-purple-100 border-purple-200",
+  "bg-orange-100 border-orange-200",
+];
 
-  // 1. Fetch Todos
-  const fetchTodos = async () => {
-    try {
-      setLoading(true);
-      const response = await api.get<Todo[]>('/todos/');
-      // Sort: Pending tasks first, then completed ones
-      const sortedTodos = response.data.sort((a, b) => Number(a.is_completed) - Number(b.is_completed));
-      setTodos(sortedTodos);
-    } catch (error) {
-      console.error("Fetch error:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+const getStickyColor = (id: number) => STICKY_COLORS[id % STICKY_COLORS.length];
 
-  // 2. Add Todo
-  const addTodo = async () => {
-    if (!newTodo.trim()) return;
-    try {
-      const response = await api.post<Todo>('/todos/', { 
-        title: newTodo,
-        is_completed: false 
-      });
-      // Add new task to the top of the list
-      setTodos([response.data, ...todos]);
-      setNewTodo('');
-      toast({ status: 'success', title: 'Task created.', position: 'bottom-right' });
-    } catch (error) {
-      toast({ status: 'error', title: 'Failed to create task.', position: 'bottom-right' });
-    }
-  };
+const getDaysLeft = (dateString?: string | null) => {
+  if (!dateString) return null;
 
-  // 3. Toggle Status (Complete/Incomplete)
-  const toggleTodo = async (id: number, currentStatus: boolean) => {
-    try {
-      // Optimistic UI update: Update state immediately for better UX
-      const updatedTodos = todos.map(t => t.id === id ? { ...t, is_completed: !currentStatus } : t);
-      // Re-sort to move completed items to the bottom
-      setTodos(updatedTodos.sort((a, b) => Number(a.is_completed) - Number(b.is_completed)));
+  const due = new Date(dateString);
+  const today = new Date();
 
-      await api.put(`/todos/${id}`, { is_completed: !currentStatus });
-    } catch (error) {
-      toast({ status: 'error', title: 'Update failed.', position: 'bottom-right' });
-      fetchTodos(); // Revert on error
-    }
-  };
+  due.setHours(0, 0, 0, 0);
+  today.setHours(0, 0, 0, 0);
 
-  // 4. Delete Todo
-  const deleteTodo = async (id: number) => {
-    try {
-      await api.delete(`/todos/${id}`);
-      setTodos(todos.filter(t => t.id !== id));
-      toast({ status: 'info', title: 'Task deleted.', position: 'bottom-right' });
-    } catch (error) {
-      toast({ status: 'error', title: 'Delete failed.', position: 'bottom-right' });
-    }
-  };
+  const diffTime = due.getTime() - today.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-  // --- RENDER ---
-
-  if (loading && todos.length === 0) {
+  if (diffDays < 0) {
     return (
-      <Container centerContent py={20}>
-        <Spinner size="xl" color="teal.500" thickness='4px' />
-        <Text mt={4} color="gray.500">Loading your tasks...</Text>
-      </Container>
+      <span className="bg-red-200 text-red-800 px-2 py-0.5 rounded text-xs font-bold">
+        Overdue {Math.abs(diffDays)}d
+      </span>
+    );
+  }
+
+  if (diffDays === 0) {
+    return (
+      <span className="bg-orange-200 text-orange-800 px-2 py-0.5 rounded text-xs font-bold">
+        Today
+      </span>
     );
   }
 
   return (
-    <Box minH="100vh" bg="gray.50">
-      {/* 1. Navbar Component */}
-      <Navbar />
+    <span className="bg-white/50 text-gray-700 px-2 py-0.5 rounded text-xs font-bold">
+      {diffDays} days left
+    </span>
+  );
+};
 
-      <Container maxW="container.md">
-        <VStack spacing={6} align="stretch">
-          
-          {/* 2. Add Task Section */}
-          <Card variant="outline" borderColor="teal.200" boxShadow="sm">
-            <CardBody>
-              <HStack>
-                <Input 
-                  placeholder="What needs to be done?" 
-                  size="lg"
-                  variant="filled"
-                  value={newTodo}
-                  onChange={(e) => setNewTodo(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && addTodo()}
-                  autoFocus
-                />
-                <Button 
-                  leftIcon={<AddIcon />} 
-                  colorScheme="teal" 
-                  size="lg" 
-                  onClick={addTodo}
-                  px={8}
+export default function Home() {
+  const router = useRouter();
+  const toast = useToast();
+
+  const [todos, setTodos] = useState<Todo[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Delete modal
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleteTodoId, setDeleteTodoId] = useState<number | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
+  // Edit modal
+  const [editTodo, setEditTodo] = useState<Todo | null>(null);
+
+  const fetchCategories = async () => {
+    const data = await getCategories();
+    setCategories(data);
+  };
+
+  const fetchTodos = async () => {
+    const data = await getTodos();
+    setTodos(data);
+  };
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        router.push("/login");
+        return;
+      }
+
+      try {
+        const [todosData, categoriesData] = await Promise.all([
+          getTodos(),
+          getCategories(),
+        ]);
+
+        setTodos(todosData);
+        setCategories(categoriesData);
+      } catch (err) {
+        console.error(err);
+        toast.error("Load failed", "Could not fetch your data.");
+      } finally {
+        setLoading(false);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [router, toast]);
+
+  const handleLogout = async () => {
+    await signOut(auth);
+    router.push("/login");
+  };
+
+  const handleToggle = async (id: number, completed: boolean) => {
+    setTodos((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, is_completed: !completed } : t))
+    );
+
+    try {
+      await updateTodo(id, { is_completed: !completed });
+    } catch (e) {
+      console.error(e);
+      toast.error("Update failed", "Could not update todo.");
+      await fetchTodos();
+    }
+  };
+
+  // Drag & Drop reorder (UI only, NOT persisted)
+  const handleDragEnd = (event: any) => {
+    const { active, over } = event;
+    if (!over) return;
+    if (active.id === over.id) return;
+
+    setTodos((items) => {
+      const oldIndex = items.findIndex((t) => t.id === active.id);
+      const newIndex = items.findIndex((t) => t.id === over.id);
+      return arrayMove(items, oldIndex, newIndex);
+    });
+
+    toast.info("Reordered", "Order changed (not saved).");
+  };
+
+  const askDeleteTodo = (id: number) => {
+    setDeleteTodoId(id);
+    setDeleteModalOpen(true);
+  };
+
+  const closeDeleteTodo = () => {
+    if (deleteLoading) return;
+    setDeleteModalOpen(false);
+    setDeleteTodoId(null);
+  };
+
+  const confirmDeleteTodo = async () => {
+    if (!deleteTodoId) return;
+
+    setDeleteLoading(true);
+    try {
+      setTodos((prev) => prev.filter((t) => t.id !== deleteTodoId));
+      await deleteTodo(deleteTodoId);
+
+      toast.success("Deleted", "Sticky note removed.");
+      closeDeleteTodo();
+    } catch (e) {
+      console.error(e);
+      toast.error("Delete failed", "Please try again.");
+      await fetchTodos();
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  const handleTodoAdded = (todo: Todo) => {
+    setTodos((prev) => [todo, ...prev]); // newest-first UX
+    toast.success("Added", "New sticky note created.");
+  };
+
+  const handleTodoUpdated = (updated: Todo) => {
+    setTodos((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+    toast.success("Saved", "Todo updated successfully.");
+  };
+
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center text-gray-500">
+        Loading...
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-[#F3F4F6] p-6">
+      <div className="max-w-7xl mx-auto">
+        <header className="flex justify-between items-center mb-10">
+          <div>
+            <h1 className="text-4xl font-extrabold text-gray-900 tracking-tight">
+              📌 Sticky Wall
+            </h1>
+            <p className="text-gray-500 mt-1">Manage your tasks colorfully.</p>
+          </div>
+
+          <div className="flex gap-4 items-center">
+            <CategoryManager
+              categories={categories}
+              refreshCategories={fetchCategories}
+              onCategoryAdded={fetchCategories}
+            />
+
+            <button
+              onClick={handleLogout}
+              className="text-sm font-semibold text-gray-700 hover:text-red-600 hover:bg-red-50 px-3 py-2 rounded-lg transition-colors"
+            >
+              Log out
+            </button>
+          </div>
+        </header>
+
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
+          <div className="lg:col-span-1 space-y-6 sticky top-6">
+            <TodoForm categories={categories} onTodoAdded={handleTodoAdded} />
+          </div>
+
+          <div className="lg:col-span-3">
+            {todos.length === 0 ? (
+              <div className="py-20 text-center text-gray-400">
+                <div className="text-6xl mb-4">📝</div>
+                <p className="text-lg">Wall is empty! Add a new sticky note.</p>
+              </div>
+            ) : (
+              <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                <SortableContext
+                  items={todos.map((t) => t.id)}
+                  strategy={rectSortingStrategy}
                 >
-                  Add
-                </Button>
-              </HStack>
-            </CardBody>
-          </Card>
-
-          {/* 3. Task Stats (Optional) */}
-          <HStack justify="space-between" px={2}>
-            <Text color="gray.600" fontWeight="medium">
-              You have {todos.filter(t => !t.is_completed).length} pending tasks
-            </Text>
-          </HStack>
-
-          {/* 4. Task List */}
-          <VStack align="stretch" spacing={3}>
-            {todos.length === 0 && (
-              <Box textAlign="center" py={10} color="gray.400">
-                <Text fontSize="6xl">🎉</Text>
-                <Text fontSize="xl" mt={4}>No tasks yet.</Text>
-                <Text>Enjoy your day or add a new task above!</Text>
-              </Box>
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                    {todos.map((todo) => (
+                      <SortableTodoCard
+                        key={todo.id}
+                        todo={todo}
+                        categories={categories}
+                        getDaysLeft={getDaysLeft}
+                        getStickyColor={getStickyColor}
+                        onToggle={handleToggle}
+                        onEdit={(t) => setEditTodo(t)}
+                        onDelete={(id) => askDeleteTodo(id)}
+                      />
+                    ))}
+                  </div>
+                </SortableContext>
+              </DndContext>
             )}
-            
-            {todos.map((todo) => (
-              <Card 
-                key={todo.id} 
-                variant="elevated" 
-                size="sm"
-                opacity={todo.is_completed ? 0.7 : 1}
-                _hover={{ transform: 'translateY(-2px)', shadow: 'md' }}
-                transition="all 0.2s"
-              >
-                <CardBody>
-                  <Flex align="center">
-                    {/* Toggle Button */}
-                    <IconButton
-                      aria-label="Complete Task"
-                      icon={<CheckIcon />}
-                      isRound
-                      colorScheme={todo.is_completed ? "green" : "gray"}
-                      variant={todo.is_completed ? "solid" : "outline"}
-                      onClick={() => toggleTodo(todo.id, todo.is_completed)}
-                      mr={4}
-                      size="sm"
-                    />
+          </div>
+        </div>
 
-                    {/* Task Title & Badge */}
-                    <Box>
-                      <Text 
-                        fontSize="lg" 
-                        fontWeight={todo.is_completed ? "normal" : "semibold"}
-                        textDecoration={todo.is_completed ? "line-through" : "none"}
-                        color={todo.is_completed ? "gray.500" : "gray.800"}
-                      >
-                        {todo.title}
-                      </Text>
-                      <Badge 
-                        mt={1} 
-                        colorScheme={todo.is_completed ? "green" : "yellow"} 
-                        fontSize="xs"
-                      >
-                        {todo.is_completed ? "COMPLETED" : "PENDING"}
-                      </Badge>
-                    </Box>
+        <ConfirmModal
+          open={deleteModalOpen}
+          title="Delete this sticky note?"
+          description="This action cannot be undone."
+          confirmText="Delete"
+          cancelText="Cancel"
+          danger
+          loading={deleteLoading}
+          onConfirm={confirmDeleteTodo}
+          onClose={closeDeleteTodo}
+        />
 
-                    <Spacer />
-
-                    {/* Delete Button */}
-                    <IconButton 
-                      aria-label="Delete Task" 
-                      icon={<DeleteIcon />} 
-                      colorScheme="red" 
-                      variant="ghost" 
-                      onClick={() => deleteTodo(todo.id)}
-                      _hover={{ bg: 'red.100' }}
-                    />
-                  </Flex>
-                </CardBody>
-              </Card>
-            ))}
-          </VStack>
-
-        </VStack>
-      </Container>
-    </Box>
+        <EditTodoModal
+          open={!!editTodo}
+          todo={editTodo}
+          categories={categories}
+          onClose={() => setEditTodo(null)}
+          onSaved={handleTodoUpdated}
+        />
+      </div>
+    </div>
   );
 }

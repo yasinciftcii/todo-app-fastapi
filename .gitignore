@@ -1,24 +1,89 @@
-# General
-__pycache__/
-*.pyc
+# =========================
+# OS / System
+# =========================
 .DS_Store
+Thumbs.db
 
-# Environment Variables
-.env
-.env.local
-.env.*
-
+# =========================
 # Python
+# =========================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
 venv/
 env/
+.venv/
 backend/venv/
 backend/env/
 
-# Node Modules
+# =========================
+# Environment Variables (CRITICAL)
+# =========================
+.env
+.env.local
+.env.*
+backend/.env
+frontend/.env.local
+
+# =========================
+# Firebase Secrets (CRITICAL)
+# =========================
+firebase-service-account.json
+serviceAccountKey.json
+backend/firebase-service-account.json
+backend/serviceAccountKey.json
+
+# =========================
+# Databases (CRITICAL)
+# =========================
+*.db
+*.sqlite
+*.sqlite3
+backend/*.db
+test_temp.db
+test_todos.db
+
+# =========================
+# Logs
+# =========================
+*.log
+logs/
+
+# =========================
+# Node / Next.js
+# =========================
 node_modules/
 frontend/node_modules/
 
-# Firebase Sensitive Files
-serviceAccountKey.json
-backend/serviceAccountKey.json
-firebase-service-account.json
+.next/
+frontend/.next/
+
+out/
+build/
+dist/
+
+# =========================
+# Deployment / local config
+# =========================
+render-todo_app.txt
+
+# =========================
+# IDE / Editor
+# =========================
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# =========================
+# Cache
+# =========================
+.cache/
+.pytest_cache/
+
+# =========================
+# Optional
+# =========================
+coverage/
