@@ -160,9 +160,11 @@ Authentication handled via Firebase.
 ```bash
 git clone https://github.com/yasinciftcii/todo-app-fastapi.git
 cd todo-app-fastapi
+```bash
 
-### 2. Environment Setup ⚙️
+## 2. Environment Setup ⚙️
 
+```bash
 Since this project handles sensitive data, we use environment variables. You need to configure them before running the app.
 
 **Backend Setup:**
@@ -182,10 +184,13 @@ Since this project handles sensitive data, we use environment variables. You nee
     ```bash
     NEXT_PUBLIC_API_URL=http://localhost:8000
     ```
+```bash
 
 ### 3. Run with Docker 🐳
 
+```bash
 The easiest way to run the app is using Docker Compose. This will set up the database, backend, and frontend containers automatically.
 
 ```bash
 docker-compose up -d --build
+```bash
