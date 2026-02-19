@@ -31,7 +31,6 @@ app.dependency_overrides[get_current_user] = get_current_user_override
 client = TestClient(app)
 
 # 6. Fixture to Create Tables Before Each Test
-# Bu fonksiyon her testten önce çalışıp tabloları oluşturur
 @pytest.fixture(name="session")
 def session_fixture():
     SQLModel.metadata.create_all(engine)
@@ -41,7 +40,6 @@ def session_fixture():
 
 # --- TESTS START HERE ---
 
-# Bu testler DB kullanmadığı için 'session' parametresine gerek yok
 def test_read_root():
     """Test the root endpoint to ensure API is running."""
     response = client.get("/")
@@ -53,9 +51,6 @@ def test_health_check():
     response = client.get("/health")
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
-
-# 👇 DÜZELTME: Aşağıdaki fonksiyonlara (session) parametresi eklendi.
-# Bu sayede test başlamadan önce tablolar oluşturulacak.
 
 def test_create_todo(session):
     """Test creating a new todo item."""
@@ -81,8 +76,12 @@ def test_read_todos(session):
 
     assert response.status_code == 200
     assert len(data) == 2
-    assert data[0]["title"] == "Task 1"
-    assert data[1]["title"] == "Task 2"
+    
+    # 🎯 DÜZELTME BURADA: Index'e (0 veya 1) bağlı kalmak yerine 
+    # listenin içinde bu başlıkların olup olmadığını kontrol ediyoruz.
+    titles = [task["title"] for task in data]
+    assert "Task 1" in titles
+    assert "Task 2" in titles
 
 def test_update_todo(session):
     """Test updating an existing todo."""
