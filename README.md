@@ -5,8 +5,7 @@ A modern, secure, and production-ready Sticky Notes / To-Do application built wi
 This app allows users to create, manage, and organize tasks with categories, priority levels, due dates, and a modern sticky-wall UI.
 
 🌐 **Live Demo:**  
-Frontend (Vercel): https://dotodo-app.vercel.app/login  
-Backend API Docs: https://your-backend-url/docs
+Frontend (Vercel): https://dotodo-app.vercel.app/
 
 ---
 
@@ -161,3 +160,32 @@ Authentication handled via Firebase.
 ```bash
 git clone https://github.com/yasinciftcii/todo-app-fastapi.git
 cd todo-app-fastapi
+
+### 2. Environment Setup ⚙️
+
+Since this project handles sensitive data, we use environment variables. You need to configure them before running the app.
+
+**Backend Setup:**
+1.  Navigate to the `backend/` folder.
+2.  Create a copy of the example file:
+    * Copy content from `backend/.env.example` to a new file named `.env`.
+3.  Open `backend/.env` and fill in your database credentials.
+4.  Place your Firebase Admin JSON file inside the `backend/` folder and rename it to:
+    * `firebase-service-account.json`
+
+**Frontend Setup:**
+1.  Navigate to the `frontend/` folder.
+2.  Create a copy of the example file:
+    * Copy content from `frontend/.env.local.example` to a new file named `.env.local`.
+3.  Open `frontend/.env.local` and paste your Firebase Client keys (API Key, Auth Domain, etc.) from the Firebase Console.
+4.  Set the API URL:
+    ```bash
+    NEXT_PUBLIC_API_URL=http://localhost:8000
+    ```
+
+### 3. Run with Docker 🐳
+
+The easiest way to run the app is using Docker Compose. This will set up the database, backend, and frontend containers automatically.
+
+```bash
+docker-compose up -d --build
