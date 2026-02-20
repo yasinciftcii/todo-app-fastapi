@@ -23,21 +23,14 @@ async def lifespan(app: FastAPI):
     print("Application shutting down...")
 
 
-app = FastAPI(title="To-Do App Backend", lifespan=lifespan)
+# IMPORTANT: disable trailing-slash redirects to avoid CORS issues on 307/308
+app = FastAPI(title="To-Do App Backend", lifespan=lifespan, redirect_slashes=False)
 
-# -------------------------
-# CORS
-# -------------------------
+# CORS: safest for token-based auth (Authorization header), no cookies
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "https://dotodo-app.vercel.app",
-    ],
-    # Allow Vercel preview domains too: https://<anything>.vercel.app
-    allow_origin_regex=r"https://.*\.vercel\.app",
-    allow_credentials=True,
+    allow_origins=["*"],          # allow all origins
+    allow_credentials=False,      # MUST be False when allow_origins=["*"]
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -45,7 +38,6 @@ app.add_middleware(
 # -------------------------
 # Category Endpoints
 # -------------------------
-
 @app.post("/categories/", response_model=CategoryRead)
 @app.post("/categories", response_model=CategoryRead, include_in_schema=False)
 def create_category(
@@ -109,7 +101,6 @@ def delete_category(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
-    """Delete a category and move its todos to Uncategorized (category_id=None)."""
     category = session.get(Category, category_id)
     if not category:
         raise HTTPException(status_code=404, detail="Category not found")
@@ -137,7 +128,6 @@ def delete_category(
 # -------------------------
 # Todo Endpoints
 # -------------------------
-
 @app.post("/todos/", response_model=TodoRead)
 @app.post("/todos", response_model=TodoRead, include_in_schema=False)
 def create_todo(
