@@ -25,23 +25,29 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="To-Do App Backend", lifespan=lifespan)
 
+# -------------------------
+# CORS
+# -------------------------
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
         "http://127.0.0.1:3000",
-        "https://dotodo-app.vercel.app"
+        "https://dotodo-app.vercel.app",
     ],
-    allow_credentials=False,
+    # Allow Vercel preview domains too: https://<anything>.vercel.app
+    allow_origin_regex=r"https://.*\.vercel\.app",
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-
 # -------------------------
 # Category Endpoints
 # -------------------------
+
 @app.post("/categories/", response_model=CategoryRead)
+@app.post("/categories", response_model=CategoryRead, include_in_schema=False)
 def create_category(
     category: CategoryCreate,
     session: Session = Depends(get_session),
@@ -62,6 +68,7 @@ def create_category(
 
 
 @app.get("/categories/", response_model=List[CategoryRead])
+@app.get("/categories", response_model=List[CategoryRead], include_in_schema=False)
 def read_categories(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user)
@@ -130,7 +137,9 @@ def delete_category(
 # -------------------------
 # Todo Endpoints
 # -------------------------
+
 @app.post("/todos/", response_model=TodoRead)
+@app.post("/todos", response_model=TodoRead, include_in_schema=False)
 def create_todo(
     *,
     session: Session = Depends(get_session),
@@ -145,12 +154,12 @@ def create_todo(
 
 
 @app.get("/todos/", response_model=List[TodoRead])
+@app.get("/todos", response_model=List[TodoRead], include_in_schema=False)
 def read_todos(
     *,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
-    # Default ordering: newest first (you can change to due_date if you want)
     statement = (
         select(Todo)
         .where(Todo.owner_uid == current_user.uid)
