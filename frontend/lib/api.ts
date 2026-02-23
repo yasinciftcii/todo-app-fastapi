@@ -28,12 +28,12 @@ api.interceptors.request.use(async (config) => {
 // --- TODO API CALLS ---
 
 export const getTodos = async (): Promise<Todo[]> => {
-    const response = await api.get('/todos'); // Sondaki '/' silindi
+    const response = await api.get('/todos');
     return response.data;
 };
 
 export const createTodo = async (todo: CreateTodoInput): Promise<Todo> => {
-    const response = await api.post('/todos', todo); // Sondaki '/' silindi
+    const response = await api.post('/todos', todo);
     return response.data;
 };
 
@@ -49,12 +49,12 @@ export const deleteTodo = async (id: number): Promise<void> => {
 // --- CATEGORY API CALLS (NEW) ---
 
 export const getCategories = async (): Promise<Category[]> => {
-    const response = await api.get('/categories'); // Sondaki '/' silindi
+    const response = await api.get('/categories');
     return response.data;
 };
 
 export const createCategory = async (category: CategoryCreate): Promise<Category> => {
-    const response = await api.post('/categories', category); // Sondaki '/' silindi
+    const response = await api.post('/categories', category);
     return response.data;
 };
 
