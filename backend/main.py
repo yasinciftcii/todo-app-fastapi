@@ -23,24 +23,22 @@ async def lifespan(app: FastAPI):
     print("Application shutting down...")
 
 
-app = FastAPI(
-    title="To-Do App Backend",
-    lifespan=lifespan,
-)
+app = FastAPI(title="To-Do App Backend", lifespan=lifespan)
 
-# IMPORTANT:
-# - allow_credentials should be False if you're not using cookies.
-# - Authorization header is fine with allow_credentials=False.
+app.router.redirect_slashes = False
+
+ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "https://dotodo-app.vercel.app",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "https://dotodo-app.vercel.app",
-    ],
-    # Allow preview deployments like https://xxxx.vercel.app
-    allow_origin_regex=r"https://.*\.vercel\.app",
-    allow_credentials=False,
+    allow_origins=ALLOWED_ORIGINS,
+    # Preview deployments like https://anything.vercel.app
+    allow_origin_regex=r"^https://.*\.vercel\.app$",
+    allow_credentials=False,  # Using Authorization header, not cookies
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -54,7 +52,7 @@ app.add_middleware(
 def create_category(
     category: CategoryCreate,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user)
 ):
     name = (category.name or "").strip()
     if not name:
@@ -71,7 +69,7 @@ def create_category(
 @app.get("/categories/", response_model=List[CategoryRead])
 def read_categories(
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user)
 ):
     statement = select(Category).where(Category.owner_uid == current_user.uid)
     return session.exec(statement).all()
@@ -82,7 +80,7 @@ def update_category(
     category_id: int,
     payload: CategoryUpdate,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user)
 ):
     category = session.get(Category, category_id)
     if not category:
@@ -107,7 +105,7 @@ def update_category(
 def delete_category(
     category_id: int,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user)
 ):
     """Delete a category and move its todos to Uncategorized (category_id=None)."""
     category = session.get(Category, category_id)
@@ -120,7 +118,7 @@ def delete_category(
     todos_in_category = session.exec(
         select(Todo).where(
             Todo.owner_uid == current_user.uid,
-            Todo.category_id == category_id,
+            Todo.category_id == category_id
         )
     ).all()
 
@@ -143,7 +141,7 @@ def create_todo(
     *,
     session: Session = Depends(get_session),
     todo: TodoCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user)
 ):
     todo_with_owner = Todo.model_validate(todo, update={"owner_uid": current_user.uid})
     session.add(todo_with_owner)
@@ -157,7 +155,7 @@ def create_todo(
 def read_todos(
     *,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user)
 ):
     statement = (
         select(Todo)
@@ -171,7 +169,7 @@ def read_todos(
 def read_todo(
     *,
     session: Session = Depends(get_session),
-    todo_id: int,
+    todo_id: int
 ):
     todo = session.get(Todo, todo_id)
     if not todo:
@@ -185,7 +183,7 @@ def update_todo(
     session: Session = Depends(get_session),
     todo_id: int,
     todo: TodoUpdate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user)
 ):
     db_todo = session.get(Todo, todo_id)
     if not db_todo:
@@ -209,7 +207,7 @@ def delete_todo(
     *,
     session: Session = Depends(get_session),
     todo_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user)
 ):
     todo = session.get(Todo, todo_id)
     if not todo:
